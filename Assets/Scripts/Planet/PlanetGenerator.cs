@@ -123,6 +123,22 @@ public class PlanetGenerator : MonoBehaviour
         };
 #endif
     }
+    private bool IsPatchOccluded(CubeSpherePatch patch, Transform camera, float planetRadius)
+    {
+        Vector3 patchCenter = patch.GameObject.transform.position;
+        Vector3 cameraPos = camera.position;
+        Vector3 direction = (patchCenter - cameraPos).normalized;
+        float distance = Vector3.Distance(cameraPos, patchCenter);
+
+        // Raycast to see if something blocks the patch (planet collider)
+        if (Physics.Raycast(cameraPos, direction, out RaycastHit hit, distance))
+        {
+            // If the hit is the planet itself, patch is occluded
+            if (hit.collider.transform == this.transform)
+                return true;
+        }
+        return false;
+    }
 
     private void Update()
     {
@@ -132,15 +148,26 @@ public class PlanetGenerator : MonoBehaviour
         {
             if (patch != null)
             {
-                // Dynamically calculate resolution based on camera distance
-                float dist = Vector3.Distance(patch.GameObject.transform.position, playerCamera.position);
-                int dynamicResolution = Mathf.Clamp(
-                    Mathf.RoundToInt(Mathf.Lerp(settings.maxResolution, settings.minResolution, dist / settings.maxLODDistance)),
-                    settings.minResolution,
-                    settings.maxResolution
-                );
+                bool occluded = IsPatchOccluded(patch, playerCamera, settings.radius);
 
-                patch.UpdateLOD(playerCamera, settings.maxLODDepth, settings.subdivideDistance, settings.mergeDistance, Vector2.zero, Vector2.one);
+                if (occluded)
+                {
+                    // Force minimum resolution if occluded
+                    patch.UpdateLOD(playerCamera, settings.minResolution, settings.maxLODDepth, float.MaxValue, 0f);
+                }
+                else 
+                {
+                    // Dynamically calculate resolution based on camera distance
+                    float dist = Vector3.Distance(patch.GameObject.transform.position, playerCamera.position);
+                    int dynamicResolution = Mathf.Clamp(
+                        Mathf.RoundToInt(Mathf.Lerp(settings.maxResolution, settings.minResolution, dist / settings.maxLODDistance)),
+                        settings.minResolution,
+                        settings.maxResolution
+                    );
+
+                    patch.UpdateLOD(playerCamera, dynamicResolution, settings.maxLODDepth, settings.subdivideDistance, settings.mergeDistance);
+                }
+                    
             }
         }
     }

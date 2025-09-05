@@ -177,39 +177,49 @@ public class CubeSpherePatch
         float slope = Mathf.Sqrt(dx * dx + dy * dy);
 
         float slopeT = Mathf.InverseLerp(0f, settings.slopeThreshold, slope);
-        slopeT = Mathf.Clamp01(slopeT);
+        slopeT = Mathf.Round(slopeT * 3f) / 3f; // snap into 3 chunks
 
         float waterT = Mathf.InverseLerp(waterThreshold - waterBlend, waterThreshold + waterBlend, currentHeight);
         waterT = Mathf.Clamp01(waterT);
+
+        // waterT = (currentHeight < waterThreshold) ? 0f : 1f; // hard water cutoff
+
 
         Color landColor = Color.Lerp(settings.grassColor, settings.rockColor, slopeT);
         return Color.Lerp(settings.waterColor, landColor, waterT);
     }
 
-    public void UpdateLOD(Transform player, int maxDepth, float baseSubdivideDistance, float mergeDistance,
-                      Vector2 uvMin, Vector2 uvMax, float maxViewAngle = 90f)
+    public void UpdateLOD(
+        Transform player,
+        int newResolution,
+        int maxDepth,
+        float baseSubdivideDistance,
+        float mergeDistance,
+        Vector2 uvMin = default,     // default to (0,0)
+        Vector2 uvMax = default,     // default to (0,0) — we’ll fix inside
+        float maxViewAngle = 90f
+    )
     {
+        if (uvMax == default) uvMax = Vector2.one; // ensures proper default
+
         if (patchObject == null) return;
 
-        // --- 1. Calculate patch world position as patch center ---
+        resolution = newResolution;
+
+        // Calculate patch world position as patch center
         Vector3 patchCenterWorld = patchObject.transform.position;
 
-        // --- 2. Distance from camera to patch surface ---
+        // Distance from camera to patch surface
         float distanceToSurface = Mathf.Max(0f, Vector3.Distance(player.position, patchCenterWorld) - radius);
 
-        // --- 3. Angular FOV check ---
-        Vector3 patchToCamera = (player.position - patchCenterWorld).normalized;
-        float angleToCamera = Vector3.Angle(player.forward, patchToCamera);
-        bool inFOV = angleToCamera > maxViewAngle;
-
-        // --- 4. Scale subdivide distance by depth (progressive LOD) ---
+        // Scale subdivide distance by depth (progressive LOD)
         float subdivideDistance = baseSubdivideDistance / (depth + 1);
         float mergeThreshold = mergeDistance * 1.1f; // hysteresis
 
-        bool shouldSubdivide = distanceToSurface < subdivideDistance && depth < maxDepth; //add FOV logic later
+        bool shouldSubdivide = distanceToSurface < subdivideDistance && depth < maxDepth;
         bool shouldMerge = children != null && distanceToSurface > mergeThreshold;
 
-        // --- 5. Subdivide ---
+        // Subdivide
         if (shouldSubdivide)
         {
             if (children == null)
@@ -240,8 +250,16 @@ public class CubeSpherePatch
             for (int i = 0; i < 4; i++)
             {
                 Vector2 childUVMinsLocal = uvMin + new Vector2((i % 2) * childPatchSize.x, (i / 2) * childPatchSize.y);
-                children[i].UpdateLOD(player, maxDepth, baseSubdivideDistance, mergeDistance,
-                                      childUVMinsLocal, childUVMinsLocal + childPatchSize, maxViewAngle);
+                children[i].UpdateLOD(
+                    player,
+                    resolution,
+                    maxDepth,
+                    baseSubdivideDistance,
+                    mergeDistance,
+                    childUVMinsLocal,
+                    childUVMinsLocal + childPatchSize,
+                    maxViewAngle
+                );
             }
         }
         // --- 6. Merge ---
@@ -278,8 +296,16 @@ public class CubeSpherePatch
             for (int i = 0; i < 4; i++)
             {
                 Vector2 childUVMinsLocal = uvMin + new Vector2((i % 2) * childPatchSize.x, (i / 2) * childPatchSize.y);
-                children[i].UpdateLOD(player, maxDepth, baseSubdivideDistance, mergeDistance,
-                                      childUVMinsLocal, childUVMinsLocal + childPatchSize, maxViewAngle);
+                children[i].UpdateLOD(
+                    player,
+                    resolution,
+                    maxDepth,
+                    baseSubdivideDistance,
+                    mergeDistance,
+                    childUVMinsLocal,
+                    childUVMinsLocal + childPatchSize,
+                    maxViewAngle
+                );
             }
 
             if (meshRenderer != null)

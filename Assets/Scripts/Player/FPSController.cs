@@ -83,11 +83,11 @@ public class FPSController : MonoBehaviour
         Vector3 origin = transform.position;
 
         // Length of the ray should be at least half the character height plus a small buffer
-        float rayDistance = controller.height / 2 + 0.3f;
+        float rayDistance = controller.height / 2 + 0.1f;
 
-        UnityEngine.Debug.DrawRay(transform.position, -gravityDirection * rayDistance, Color.red);
+        UnityEngine.Debug.DrawRay(transform.position, gravityDirection * rayDistance, Color.red);
 
-        return Physics.Raycast(origin, -gravityDirection, out RaycastHit hit, rayDistance);
+        return Physics.Raycast(origin, gravityDirection, out RaycastHit hit, rayDistance);
     }
     #endregion
 
@@ -119,13 +119,26 @@ public class FPSController : MonoBehaviour
         moveInput = context.ReadValue<Vector2>();
     }
 
+    private bool CheckCanJump(Vector3 gravityDirection)
+    {
+        // Start at the center of the character
+        Vector3 origin = transform.position;
+
+        // Length of the ray should be at least half the character height plus a small buffer
+        float rayDistance = controller.height / 2 + 0.3f;
+
+        UnityEngine.Debug.DrawRay(transform.position, gravityDirection * rayDistance, Color.blue);
+
+        return Physics.Raycast(origin, gravityDirection, out RaycastHit hit, rayDistance);
+    }
+
     public void OnJump(InputAction.CallbackContext context)
     {
         Vector3 gravityDirection = GetGravityDirection();
 
-        if (context.performed && CheckGrounded(gravityDirection))
+        if (context.performed && CheckCanJump(gravityDirection))
         {
-            UnityEngine.Debug.Log("Jump");
+            //UnityEngine.Debug.Log("Jump");
             velocity += -gravityDirection * Mathf.Sqrt(jumpHeight * 2f * gravity);
             jumpTimer = jumpCooldown;
         }
@@ -141,7 +154,6 @@ public class FPSController : MonoBehaviour
 
         Vector3 horizontalMove = right * moveInput.x + forward * moveInput.y;
         horizontalMove *= walkSpeed;
-        horizontalMove *= walkSpeed;
 
         // Apply horizontal movement directly (instant)
         Vector3 horizontalVelocity = horizontalMove;
@@ -155,6 +167,7 @@ public class FPSController : MonoBehaviour
         // Cancel downward velocity if grounded
         if (isGrounded && Vector3.Dot(velocity, gravityDirection) > 0f)
         {
+            // Zero out velocity along gravity direction when grounded
             velocity -= Vector3.Project(velocity, gravityDirection);
         }
 
